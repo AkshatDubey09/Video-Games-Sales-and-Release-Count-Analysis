@@ -1,0 +1,136 @@
+---
+title: "Video Games Sales and Release Count Analysis"
+author: "Akshat Dubey"
+date: "2026-01-01"
+output:
+  html_document:
+    toc: true
+  html_document:
+    theme: paper
+    toc: true
+    toc_float: true
+---
+
+First, we'll load the dataset and clean.
+```{r loading}
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+video_games_sales1 <- read.csv("vgsales.csv", na.strings = c("N/A", " "))
+clean_sales <- video_games_sales1 %>%
+  drop_na()
+```
+
+We have now loaded the data and dropped the rows containing NA values as they'll affect the analysis result.
+
+### Most popular genre of games on a regional basis and how they comapre with Global Sales 
+
+```{r genre popularity}
+# Grouping the data based on genre popularity in different regions
+genre_regional_sales <- clean_sales %>% 
+  group_by(Genre) %>%
+  summarise(
+    NA_Sales = sum(NA_Sales),
+    EU_Sales = sum(EU_Sales),
+    JP_Sales = sum(JP_Sales),
+    Global_Sales = sum(Global_Sales)
+  )
+# Pivot the data to stack the columns so we can use "Region" as a variable for plotting
+sales_long <- genre_regional_sales %>%
+  pivot_longer(
+    cols = c(NA_Sales, EU_Sales, JP_Sales, Global_Sales),
+    names_to = "Region",
+    values_to = "Sales"
+  )
+# Plotting the charts
+ggplot(sales_long, aes(x = reorder(Genre, -Sales), y = Sales, fill = Region)) +
+  geom_col() +
+  facet_wrap(~Region, scales = "free_y") +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "Genre Popularity By Region",
+    x = "Genre",
+    y = "Total Sales (Millions)"
+  ) +
+  theme(legend.position = "none")
+  
+```
+
+##### Analysis
+The analysis reveals a distinct regional preference: while the Action genre dominates the North American, European, and Global markets, Japan shows a unique preference for Role-Playing games. Interestingly, despite being the top seller in Japan, Role-Playing only ranks 4th globally. Conversely, Strategy games consistently show the lowest sales volume across all analyzed regions.
+
+### Top 10 platforms with the highest game release and highest sales
+
+```{r platform release and sales}
+platform_summary <- clean_sales %>%
+  group_by(Platform) %>%
+  summarise(
+    Release_Count = n(),
+    Total_Sales = sum(Global_Sales)
+  ) %>%
+  arrange(desc(Total_Sales)) %>%
+  slice_head(n = 10)
+# Plot top 10
+ggplot(platform_summary, aes(x = reorder(Platform, -Total_Sales), y = Total_Sales)) +
+  geom_col(fill = "steelblue") +
+  theme_minimal() +
+  labs(
+    title = "Top 10 Platform by Global Sales",
+    x = "Platform",
+    y = "Global Sales (In Millions)"
+  )
+ggplot(platform_summary, aes(x = reorder(Platform, -Release_Count), y = Release_Count)) +
+  geom_col(fill = "darkgreen") +
+  theme_minimal() +
+  labs(
+    title = "Top 10 Platforms by Number of Game Releases",
+    x = "Platform",
+    y = "Number of Game Released"
+  )
+
+```
+
+##### Analysis
+The analysis concludes that the PS2 dominates the market in terms of revenue, holding the highest global sales, followed by the X360. Interestingly, a discrepancy exists between revenue and volume: while the Nintendo DS has the highest number of individual game releases, it ranks only 5th in total revenue. The PS2 ranks 2nd in terms of release volume, showing it was successful in both quantity and quality.
+
+### Market Saturation: Does More Games Mean More Money?
+
+```{r Market Saturation}
+period_analysis <- clean_sales %>%
+  # Create 4 year bins
+  mutate(Year_Bin = floor(Year / 4) * 4) %>%
+  group_by(Year_Bin) %>%
+  summarise(
+    Total_Sales = sum(Global_Sales),
+    Release_Count = n()
+  ) %>%
+  filter(Year_Bin >= 1990 & Year_Bin <= 2016)
+# Chart A: Revenue
+plot_revenue <- ggplot(period_analysis, aes(x = factor(Year_Bin), y = Total_Sales)) +
+  geom_col(fill = "turquoise3", alpha = 0.8) +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),
+    axis.line = element_line(color = "black")
+  ) +
+  labs(title = "Global Revenue by Era", x = " ", y = "Revenue (Millions)")
+# Chart B: Releases
+plot_releases <- ggplot(period_analysis, aes(x = factor(Year_Bin), y = Release_Count)) +
+  geom_col(fill = "darkred", alpha = 0.8) +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),
+    axis.line = element_line(color = "black")
+  ) +
+  labs(
+    title = "Number of Games by Era", x = "4-Year Period", y = "Count of Games"
+  )
+grid.arrange(plot_revenue, plot_releases, ncol = 1)
+
+```
+
+##### Analysis
+From the data, we can conclude that there is a nearly perfect positive correlation (r = 0.98) between release count and global revenue over the history of the industry.
+
+However, we observe a diminishing return in efficiency during the 2008 peak. While the number of game releases surged by 35.0% compared to the previous era, revenue only grew by 22.9%, indicating that the market was becoming saturated.
